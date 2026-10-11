@@ -1,0 +1,1475 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#14213d">
+<title>Teachers Attendance Tracker</title>
+
+<style>
+*{box-sizing:border-box}
+body{margin:0;font:15px Arial,sans-serif;background:#f3f6fb;color:#172033}
+header{background:#14213d;color:white;padding:15px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+.wrap{max-width:1100px;margin:auto;padding:14px}
+.panel{background:white;border:1px solid #e1e7f0;border-radius:12px;padding:15px;margin-bottom:14px}
+.hidden{display:none!important}
+button{border:0;border-radius:8px;padding:10px 12px;font-weight:bold;cursor:pointer;background:#e8edf5;color:#172033}
+button:disabled{opacity:.5;cursor:not-allowed}
+.blue{background:#1d4ed8;color:white}
+.red{background:#c62828;color:white}
+.green{background:#16803c;color:white}
+.tabs,.actions{display:flex;gap:7px;flex-wrap:wrap;margin:10px 0}
+.active{background:#14213d;color:white}
+.grid,.formgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px}
+.field label{display:block;font-size:13px;font-weight:bold;margin-bottom:6px}
+.field input,.field select{width:100%;padding:11px;border:1px solid #cbd5e1;border-radius:8px}
+.notice{padding:11px;border-radius:8px;background:#eff6ff;border:1px solid #bfdbfe;color:#1e40af;margin:10px 0;overflow-wrap:anywhere}
+.success{background:#f0fdf4;color:#166534;border-color:#bbf7d0}
+.error{background:#fff1f2;color:#9f1239;border-color:#fecdd3}
+.muted{font-size:13px;color:#667085}
+.tablewrap{overflow:auto}
+table{border-collapse:collapse;width:100%;min-width:600px}
+th,td{text-align:left;padding:9px;border-bottom:1px solid #e5e7eb;font-size:13px}
+th{background:#f8fafc}
+.stat{background:#eef3ff;padding:14px;border-radius:10px}
+.stat strong{display:block;font-size:25px;margin-top:5px}
+.badge{border-radius:20px;padding:4px 7px;font-size:11px;font-weight:bold}
+.PRESENT{background:#dcfce7;color:#166534}
+.LATE{background:#fef3c7;color:#92400e}
+.ABSENT{background:#fee2e2;color:#991b1b}
+.login{max-width:460px;margin:4vh auto;padding:12px}
+.login h1{text-align:center}
+.modalbg{position:fixed;inset:0;background:#0009;display:flex;align-items:center;justify-content:center;padding:12px;z-index:5}
+.modal{background:white;padding:16px;border-radius:12px;max-width:450px;width:100%;max-height:95vh;overflow:auto}
+.idcard{width:320px;max-width:100%;margin:12px auto;text-align:center;border:2px solid #14213d;border-radius:12px;overflow:hidden}
+.idhead{background:#14213d;color:white;padding:12px}
+.idbody{padding:12px}
+.idphoto{width:80px;height:80px;border-radius:50%;object-fit:cover}
+.qr{width:120px;height:120px}
+.thumb{width:38px;height:38px;object-fit:cover;border-radius:50%}
+@media print{
+body *{visibility:hidden!important}
+.printarea,.printarea *{visibility:visible!important}
+.printarea{position:absolute;top:0;left:0}
+.noprint{display:none!important}
+}
+</style>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+
+<body>
+
+<!-- LOGIN AND REGISTRATION -->
+
+<div id="auth" class="login">
+<h1>📘 Teachers Attendance Tracker</h1>
+
+<div class="panel">
+<div id="authMsg" class="notice hidden"></div>
+
+<form id="signup">
+<h2>Register your school</h2>
+
+<div class="field">
+<label>School name</label>
+<input id="schoolName" required maxlength="150">
+</div>
+
+<div class="field">
+<label>Email</label>
+<input id="signEmail" type="email" required>
+</div>
+
+<div class="field">
+<label>Password (minimum 8 characters)</label>
+<input id="signPass" type="password" minlength="8" required>
+</div>
+
+<div class="field">
+<label>Confirm password</label>
+<input id="signConfirm" type="password" minlength="8" required>
+</div>
+
+<div class="actions">
+<button class="blue" id="registerBtn">Register</button>
+<button type="button" id="toLogin">Already registered? Log in</button>
+</div>
+</form>
+
+<form id="login" class="hidden">
+<h2>School login</h2>
+
+<div class="field">
+<label>Email</label>
+<input id="loginEmail" type="email" required>
+</div>
+
+<div class="field">
+<label>Password</label>
+<input id="loginPass" type="password" required>
+</div>
+
+<div class="actions">
+<button class="blue" id="loginBtn">Log in</button>
+<button type="button" id="toSignup">Register school</button>
+<button type="button" id="forgot">Forgot password</button>
+</div>
+</form>
+
+<p class="muted">Internet is required. Confirm your email if requested.</p>
+</div>
+</div>
+
+<!-- MAIN APP -->
+
+<div id="app" class="hidden">
+<header>
+<div>
+<h2 style="margin:0">Teachers Attendance Tracker</h2>
+<small id="welcome"></small>
+</div>
+
+<div class="actions">
+<button id="backup" class="green">Backup JSON</button>
+<button id="logout" class="red">Log out</button>
+</div>
+</header>
+
+<main class="wrap">
+
+<nav class="tabs">
+<button class="tab active" data-page="home">Dashboard</button>
+<button class="tab" data-page="teachers">Teachers</button>
+<button class="tab" data-page="attendance">Attendance Scanner</button>
+<button class="tab" data-page="reports">Reports</button>
+</nav>
+
+<section id="home" class="page">
+<h2>Dashboard <small id="today"></small></h2>
+<div id="stats" class="grid"></div>
+
+<div class="panel">
+<h3>Today's summary</h3>
+<p id="summary"></p>
+<div id="recent"></div>
+</div>
+
+<div class="panel">
+<h3>Attendance rules</h3>
+<p>Working days: Monday to Friday.</p>
+<p>7:30 AM–9:00 AM: PRESENT.</p>
+<p>From 9:01 AM: LATE.</p>
+<p>At 9:00 PM: unscanned teachers are marked ABSENT by this app if it is running and connected.</p>
+</div>
+</section>
+
+<section id="teachers" class="page hidden">
+
+<div class="panel">
+<h2 id="formTitle">Register teacher</h2>
+
+<form id="teacherForm">
+<input id="editId" type="hidden">
+
+<div class="formgrid">
+<div class="field">
+<label>Full name *</label>
+<input id="tName" required>
+</div>
+
+<div class="field">
+<label>Staff number (not shown on ID card)</label>
+<input id="tStaff">
+</div>
+
+<div class="field">
+<label>Phone</label>
+<input id="tPhone">
+</div>
+
+<div class="field">
+<label>Subject / department</label>
+<input id="tSubject">
+</div>
+
+<div class="field">
+<label>Position</label>
+<input id="tPosition">
+</div>
+
+<div class="field">
+<label>Photo (under 1 MB)</label>
+<input id="tPhoto" type="file" accept="image/*">
+</div>
+</div>
+
+<div id="photoWrap" class="hidden">
+<img id="photoPreview" class="thumb" alt="Photo preview">
+</div>
+
+<div class="actions">
+<button class="blue">Save teacher</button>
+<button type="button" id="clearTeacher">Clear</button>
+</div>
+
+<div id="teacherMsg" class="notice hidden"></div>
+</form>
+</div>
+
+<div class="panel">
+<h3>Teachers <small id="teacherCount"></small></h3>
+
+<div class="field">
+<label>Search teachers</label>
+<input id="teacherSearch" placeholder="Name, ID, phone, subject">
+</div>
+
+<div class="tablewrap">
+<table>
+<thead>
+<tr>
+<th>Photo</th>
+<th>Teacher ID</th>
+<th>Name</th>
+<th>Phone</th>
+<th>Subject</th>
+<th>Actions</th>
+</tr>
+</thead>
+<tbody id="teacherRows"></tbody>
+</table>
+</div>
+</div>
+</section>
+
+<section id="attendance" class="page hidden">
+<div class="panel">
+<h2>Automatic QR Attendance</h2>
+
+<div class="notice">
+<b>Working days:</b> Monday to Friday.<br>
+<b>7:30 AM–9:00 AM:</b> PRESENT.<br>
+<b>9:01 AM onwards:</b> LATE.<br>
+<b>9:00 PM:</b> unscanned teachers become ABSENT when this app is running and connected.
+</div>
+
+<p id="scanAvailability"></p>
+
+<div class="actions">
+<button id="camera" class="blue">📷 Scan with camera</button>
+<button id="gallery">🖼️ Scan QR from gallery</button>
+<button id="stopScanner" class="red">Stop camera</button>
+</div>
+
+<input id="qrFile" class="hidden" type="file" accept="image/*">
+
+<div id="aMsg" class="notice hidden"></div>
+
+<div id="scannerBox" class="hidden">
+<div id="qrReader"></div>
+<div id="scanMsg" class="notice hidden"></div>
+</div>
+</div>
+
+<div class="panel">
+<h3>Attendance records <button id="exportAttendance" class="green">Export CSV</button></h3>
+
+<div class="formgrid">
+<div class="field">
+<label>Filter date</label>
+<input id="filterDate" type="date">
+</div>
+
+<div class="field">
+<label>Status</label>
+<select id="filterStatus">
+<option value="">All statuses</option>
+<option>PRESENT</option>
+<option>LATE</option>
+<option>ABSENT</option>
+</select>
+</div>
+
+<div class="field">
+<label>Search</label>
+<input id="attendanceSearch" placeholder="Teacher name or ID">
+</div>
+</div>
+
+<div class="tablewrap">
+<table>
+<thead>
+<tr>
+<th>Date</th>
+<th>Teacher ID</th>
+<th>Name</th>
+<th>Status</th>
+<th>Time</th>
+<th>Note</th>
+<th>Action</th>
+</tr>
+</thead>
+<tbody id="attendanceRows"></tbody>
+</table>
+</div>
+</div>
+</section>
+
+<section id="reports" class="page hidden">
+
+<div class="panel">
+<h2>Monthly report <button id="exportReport" class="green">Export CSV</button></h2>
+
+<div class="formgrid">
+<div class="field">
+<label>Month</label>
+<select id="rMonth"></select>
+</div>
+
+<div class="field">
+<label>Year</label>
+<select id="rYear"></select>
+</div>
+
+<div class="field">
+<label>Search teacher</label>
+<input id="rSearch">
+</div>
+</div>
+
+<div class="tablewrap">
+<table>
+<thead>
+<tr>
+<th>Teacher ID</th>
+<th>Name</th>
+<th>Present</th>
+<th>Late</th>
+<th>Absent</th>
+<th>Days recorded</th>
+<th>Present %</th>
+</tr>
+</thead>
+<tbody id="reportRows"></tbody>
+</table>
+</div>
+</div>
+
+<div class="panel">
+<b>School:</b> <span id="schoolInfo"></span>
+<p class="muted">Data is stored in Supabase. Keep your password private.</p>
+<button id="refresh" class="blue">Refresh data</button>
+<button id="resetPassword">Send password reset email</button>
+<div id="settingsMsg" class="notice hidden"></div>
+</div>
+</section>
+
+</main>
+</div>
+
+<div id="modal"></div>
+
+<script>
+"use strict";
+
+/* SUPABASE CONFIGURATION */
+const URL_SUPA="https://aiohrovdymqnkdtudlxb.supabase.co";
+const KEY_SUPA="sb_publishable_zlB1p4CN4B6jb_CwAakK0g_TDC6ZFAP";
+const db=window.supabase.createClient(URL_SUPA,KEY_SUPA);
+
+const $=id=>document.getElementById(id);
+
+let user=null;
+let school=null;
+let teachers=[];
+let records=[];
+let photoData="";
+let scanner=null;
+let autoCloseBusy=false;
+
+const today=()=>{
+ const d=new Date();
+ return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
+};
+
+const nowTime=()=>{
+ const d=new Date();
+ return String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0");
+};
+
+const esc=x=>String(x??"").replace(/[&<>"']/g,c=>({
+ "&":"&amp;",
+ "<":"&lt;",
+ ">":"&gt;",
+ '"':"&quot;",
+ "'":"&#39;"
+}[c]));
+
+function say(id,text,type=""){
+ const el=$(id);
+ el.textContent=text;
+ el.className="notice "+type;
+ el.classList.remove("hidden");
+}
+
+function hide(id){$(id).classList.add("hidden");}
+function show(id){$(id).classList.remove("hidden");}
+
+function badge(status){
+ return `<span class="badge ${esc(status)}">${esc(status)}</span>`;
+}
+
+function isWorkingDay(dateString=today()){
+ const d=new Date(dateString+"T12:00:00").getDay();
+ return d>=1&&d<=5;
+}
+
+function newId(){
+ const random=crypto.randomUUID
+  ?crypto.randomUUID().replaceAll("-","").slice(0,10)
+  :Math.random().toString(36).slice(2,12);
+ return "TAT-"+random.toUpperCase();
+}
+
+function qrUrl(id){
+ return "https://api.qrserver.com/v1/create-qr-code/?size=220x220&data="+encodeURIComponent("TAT|"+id);
+}
+
+function localLog(action,detail){
+ try{
+  if(!school)return;
+  const key="tatlog_"+school.id;
+  const list=JSON.parse(localStorage.getItem(key)||"[]");
+  list.unshift({
+   at:new Date().toISOString(),
+   action,
+   detail
+  });
+  localStorage.setItem(key,JSON.stringify(list.slice(0,100)));
+ }catch(e){}
+}
+
+function setBusy(buttonId,busy,label){
+ const b=$(buttonId);
+ if(!b)return;
+ b.disabled=busy;
+ if(label)b.textContent=label;
+}
+
+async function ensureSchool(){
+ const {data,error}=await db.from("schools")
+  .select("*")
+  .eq("owner_id",user.id)
+  .maybeSingle();
+
+ if(error)throw error;
+
+ if(data){
+  school=data;
+  return;
+ }
+
+ const name=localStorage.getItem("tat_pending_school")
+  ||user.user_metadata?.school_name;
+
+ if(!name){
+  throw Error("No school profile found for this account. Please register the school first or contact the administrator.");
+ }
+
+ const result=await db.from("schools")
+  .insert({
+   school_name:name,
+   owner_id:user.id
+  })
+  .select()
+  .single();
+
+ if(result.error)throw result.error;
+
+ school=result.data;
+ localStorage.removeItem("tat_pending_school");
+}
+
+async function load(){
+ if(!school)throw Error("School profile is not loaded.");
+
+ const [teacherResult,attendanceResult]=await Promise.all([
+  db.from("teachers")
+   .select("*")
+   .eq("school_id",school.id)
+   .order("created_at",{ascending:false}),
+
+  db.from("attendance")
+   .select("*")
+   .eq("school_id",school.id)
+   .order("date",{ascending:false})
+ ]);
+
+ if(teacherResult.error)throw teacherResult.error;
+ if(attendanceResult.error)throw attendanceResult.error;
+
+ teachers=teacherResult.data||[];
+ records=attendanceResult.data||[];
+
+ renderAll();
+ updateScanAvailability();
+}
+
+function enterApp(){
+ hide("auth");
+ show("app");
+ $("welcome").textContent=school.school_name+" · "+user.email;
+ $("schoolInfo").textContent=school.school_name+" ("+user.email+")";
+}
+
+async function start(currentUser){
+ user=currentUser;
+ await ensureSchool();
+ enterApp();
+ await load();
+
+ // Automatically apply absence rules when the app starts.
+ await autoCloseDayIfNeeded();
+}
+
+$("toLogin").onclick=()=>{
+ hide("signup");
+ show("login");
+ hide("authMsg");
+};
+
+$("toSignup").onclick=()=>{
+ hide("login");
+ show("signup");
+ hide("authMsg");
+};
+
+$("signup").onsubmit=async e=>{
+ e.preventDefault();
+
+ const name=$("schoolName").value.trim();
+ const email=$("signEmail").value.trim();
+ const password=$("signPass").value;
+ const confirmPassword=$("signConfirm").value;
+
+ if(password!==confirmPassword){
+  say("authMsg","Passwords do not match.","error");
+  return;
+ }
+
+ if(password.length<8){
+  say("authMsg","Password must contain at least 8 characters.","error");
+  return;
+ }
+
+ setBusy("registerBtn",true,"Creating account...");
+ localStorage.setItem("tat_pending_school",name);
+ say("authMsg","Creating account...");
+
+ try{
+  const {data,error}=await db.auth.signUp({
+   email,
+   password,
+   options:{
+    data:{school_name:name}
+   }
+  });
+
+  if(error)throw error;
+
+  if(data.session&&data.user){
+   await start(data.user);
+   localLog("SCHOOL REGISTERED",name);
+   hide("authMsg");
+   return;
+  }
+
+  say(
+   "authMsg",
+   "Account created. Check your email and confirm your address, then log in. If email confirmation is disabled, try logging in now.",
+   "success"
+  );
+
+  hide("signup");
+  show("login");
+  $("loginEmail").value=email;
+
+ }catch(error){
+  say("authMsg",error.message||"Account registration failed.","error");
+ }finally{
+  setBusy("registerBtn",false,"Register");
+ }
+};
+
+$("login").onsubmit=async e=>{
+ e.preventDefault();
+
+ setBusy("loginBtn",true,"Logging in...");
+ say("authMsg","Logging in...");
+
+ try{
+  const {data,error}=await db.auth.signInWithPassword({
+   email:$("loginEmail").value.trim(),
+   password:$("loginPass").value
+  });
+
+  if(error)throw error;
+
+  await start(data.user);
+  hide("authMsg");
+  localLog("LOGIN","School login");
+
+ }catch(error){
+  say("authMsg","Login failed: "+(error.message||"Unknown error"),"error");
+ }finally{
+  setBusy("loginBtn",false,"Log in");
+ }
+};
+
+$("forgot").onclick=async()=>{
+ const email=$("loginEmail").value.trim();
+
+ if(!email){
+  say("authMsg","Enter your email first.","error");
+  return;
+ }
+
+ const {error}=await db.auth.resetPasswordForEmail(email);
+
+ say(
+  "authMsg",
+  error?error.message:"If this email is registered, a password reset email has been sent.",
+  error?"error":"success"
+ );
+};
+
+$("logout").onclick=async()=>{
+ await stopScanner();
+ await db.auth.signOut();
+
+ user=null;
+ school=null;
+ teachers=[];
+ records=[];
+
+ hide("app");
+ show("auth");
+ show("login");
+ hide("signup");
+ hide("authMsg");
+};
+
+document.querySelector(".tabs").onclick=e=>{
+ const button=e.target.closest("[data-page]");
+ if(!button)return;
+
+ document.querySelectorAll(".page").forEach(page=>hide(page.id));
+ show(button.dataset.page);
+
+ document.querySelectorAll(".tab").forEach(tab=>
+  tab.classList.toggle("active",tab===button)
+ );
+
+ if(button.dataset.page==="reports")renderReport();
+};
+
+/* DASHBOARD */
+
+function renderAll(){
+ renderDash();
+ renderTeachers();
+ renderAttendance();
+ renderReport();
+}
+
+function renderDash(){
+ const date=today();
+ const dayRecords=records.filter(r=>r.date===date);
+
+ const present=dayRecords.filter(r=>r.status==="PRESENT").length;
+ const late=dayRecords.filter(r=>r.status==="LATE").length;
+ const absent=dayRecords.filter(r=>r.status==="ABSENT").length;
+
+ $("today").textContent="· "+date;
+
+ $("stats").innerHTML=[
+  ["Teachers",teachers.length],
+  ["Present",present],
+  ["Late",late],
+  ["Absent",absent]
+ ].map(item=>
+  `<div class="stat">${item[0]}<strong>${item[1]}</strong></div>`
+ ).join("");
+
+ const unrecorded=Math.max(0,teachers.length-dayRecords.length);
+
+ $("summary").textContent=
+  isWorkingDay(date)
+   ?`${dayRecords.length} attendance record(s) saved today. ${unrecorded} teacher(s) without a record.`
+   :"Today is not a working day. Attendance is not required.";
+
+ $("recent").innerHTML=records.slice(0,5).map(r=>
+  `<p>${esc(r.date)} · ${esc(r.teacher_name)} · ${badge(r.status)}</p>`
+ ).join("")||"No attendance records yet.";
+}
+
+/* TEACHER MANAGEMENT */
+
+function renderTeachers(){
+ const query=$("teacherSearch").value.toLowerCase().trim();
+
+ const list=teachers.filter(t=>
+  [t.id,t.name,t.phone,t.subject,t.staff_no]
+   .join(" ")
+   .toLowerCase()
+   .includes(query)
+ );
+
+ $("teacherCount").textContent="("+teachers.length+")";
+
+ $("teacherRows").innerHTML=list.map(t=>`
+  <tr>
+   <td>${t.photo?`<img class="thumb" src="${esc(t.photo)}" alt="Teacher">`:"👤"}</td>
+   <td>${esc(t.id)}</td>
+   <td>${esc(t.name)}</td>
+   <td>${esc(t.phone||"—")}</td>
+   <td>${esc(t.subject||"—")}</td>
+   <td>
+    <button data-act="card" data-id="${esc(t.id)}">ID Card</button>
+    <button data-act="edit" data-id="${esc(t.id)}">Edit</button>
+    <button class="red" data-act="delete" data-id="${esc(t.id)}">Delete</button>
+   </td>
+  </tr>
+ `).join("")||'<tr><td colspan="6">No teachers found.</td></tr>';
+}
+
+$("teacherSearch").oninput=renderTeachers;
+
+function clearTeacherForm(){
+ $("teacherForm").reset();
+ $("editId").value="";
+ photoData="";
+ hide("photoWrap");
+ hide("teacherMsg");
+ $("formTitle").textContent="Register teacher";
+}
+
+$("clearTeacher").onclick=clearTeacherForm;
+
+$("tPhoto").onchange=()=>{
+ const file=$("tPhoto").files[0];
+ if(!file)return;
+
+ if(file.size>1024*1024){
+  say("teacherMsg","Choose a photo smaller than 1 MB.","error");
+  $("tPhoto").value="";
+  return;
+ }
+
+ const reader=new FileReader();
+
+ reader.onload=()=>{
+  photoData=reader.result;
+  $("photoPreview").src=photoData;
+  show("photoWrap");
+ };
+
+ reader.readAsDataURL(file);
+};
+
+$("teacherForm").onsubmit=async e=>{
+ e.preventDefault();
+
+ if(!school)return say("teacherMsg","School is not loaded. Log in again.","error");
+
+ const editId=$("editId").value;
+ const oldTeacher=teachers.find(t=>t.id===editId);
+
+ const value={
+  name:$("tName").value.trim(),
+  school_name:school.school_name,
+  staff_no:$("tStaff").value.trim()||null,
+  phone:$("tPhone").value.trim()||null,
+  subject:$("tSubject").value.trim()||null,
+  position:$("tPosition").value.trim()||null,
+  photo:photoData||(oldTeacher?.photo||null),
+  school_id:school.id
+ };
+
+ if(!value.name){
+  say("teacherMsg","Enter the teacher's name.","error");
+  return;
+ }
+
+ let result;
+
+ if(editId){
+  result=await db.from("teachers")
+   .update(value)
+   .eq("id",editId)
+   .eq("school_id",school.id)
+   .select()
+   .single();
+ }else{
+  value.id=newId();
+
+  result=await db.from("teachers")
+   .insert(value)
+   .select()
+   .single();
+ }
+
+ if(result.error){
+  say("teacherMsg",result.error.message,"error");
+  return;
+ }
+
+ localLog(editId?"TEACHER UPDATED":"TEACHER ADDED",value.name);
+
+ clearTeacherForm();
+
+ try{
+  await load();
+  say("teacherMsg",editId?"Teacher updated successfully.":"Teacher registered. Teacher ID: "+result.data.id,"success");
+ }catch(error){
+  say("teacherMsg","Teacher saved, but refreshing failed: "+error.message,"error");
+ }
+};
+
+$("teacherRows").onclick=async e=>{
+ const button=e.target.closest("button[data-act]");
+ if(!button)return;
+
+ const teacher=teachers.find(t=>t.id===button.dataset.id);
+ if(!teacher)return;
+
+ if(button.dataset.act==="card"){
+  showCard(teacher);
+  return;
+ }
+
+ if(button.dataset.act==="edit"){
+  $("editId").value=teacher.id;
+  $("tName").value=teacher.name||"";
+  $("tStaff").value=teacher.staff_no||"";
+  $("tPhone").value=teacher.phone||"";
+  $("tSubject").value=teacher.subject||"";
+  $("tPosition").value=teacher.position||"";
+
+  photoData=teacher.photo||"";
+
+  if(photoData){
+   $("photoPreview").src=photoData;
+   show("photoWrap");
+  }else{
+   hide("photoWrap");
+  }
+
+  $("formTitle").textContent="Edit teacher";
+  window.scrollTo(0,0);
+  return;
+ }
+
+ if(!confirm("Delete this teacher and their attendance records?"))return;
+
+ const attendanceDelete=await db.from("attendance")
+  .delete()
+  .eq("teacher_id",teacher.id)
+  .eq("school_id",school.id);
+
+ if(attendanceDelete.error){
+  alert(attendanceDelete.error.message);
+  return;
+ }
+
+ const teacherDelete=await db.from("teachers")
+  .delete()
+  .eq("id",teacher.id)
+  .eq("school_id",school.id);
+
+ if(teacherDelete.error){
+  alert(teacherDelete.error.message);
+  return;
+ }
+
+ localLog("TEACHER DELETED",teacher.name);
+ await load();
+};
+
+/* TEACHER ID CARD */
+
+function showCard(teacher){
+ const qr=qrUrl(teacher.id);
+
+ $("modal").innerHTML=`
+  <div class="modalbg" id="modalBg">
+   <div class="modal">
+    <div class="actions noprint">
+     <b style="margin-right:auto">Teacher ID Card</b>
+     <button id="closeCard">Close</button>
+    </div>
+
+    <div class="printarea">
+     <div class="idcard">
+      <div class="idhead">
+       <b>TEACHER IDENTIFICATION</b><br>
+       <small>${esc(school.school_name)}</small>
+      </div>
+
+      <div class="idbody">
+       ${teacher.photo
+        ?`<img class="idphoto" src="${esc(teacher.photo)}" alt="Teacher">`
+        :"👤"}
+
+       <h3>${esc(teacher.name)}</h3>
+
+       <p>
+        <b>Teacher ID:</b> ${esc(teacher.id)}<br>
+        <b>Subject:</b> ${esc(teacher.subject||"—")}<br>
+        <b>Position:</b> ${esc(teacher.position||"—")}<br>
+        <b>Phone:</b> ${esc(teacher.phone||"—")}
+       </p>
+
+       <img class="qr" src="${qr}" alt="Unique QR code">
+       <br>
+       <small>Present this QR code when arriving at school.</small>
+      </div>
+     </div>
+    </div>
+
+    <div class="actions noprint">
+     <button class="blue" id="printCard">Print / Save PDF</button>
+    </div>
+
+    <p class="muted noprint">Staff number is not shown on the ID card. The QR image requires internet.</p>
+   </div>
+  </div>
+ `;
+
+ $("closeCard").onclick=()=>$("modal").innerHTML="";
+
+ $("modalBg").onclick=e=>{
+  if(e.target.id==="modalBg")$("modal").innerHTML="";
+ };
+
+ $("printCard").onclick=()=>window.print();
+}
+
+/* AUTOMATIC QR ATTENDANCE */
+
+function updateScanAvailability(){
+ const date=today();
+
+ if(!isWorkingDay(date)){
+  $("scanAvailability").textContent="Attendance is closed today. Working days are Monday to Friday.";
+  $("camera").disabled=true;
+  $("gallery").disabled=true;
+  return;
+ }
+
+ $("camera").disabled=false;
+ $("gallery").disabled=false;
+
+ const time=nowTime();
+
+ if(time<"07:30"){
+  $("scanAvailability").textContent="Scanning opens at 7:30 AM. Current time: "+time;
+ }else if(time<="09:00"){
+  $("scanAvailability").textContent="Scanning is open. Scans up to 9:00 AM are marked PRESENT.";
+ }else if(time<"21:00"){
+  $("scanAvailability").textContent="Scanning is open. Scans from 9:01 AM to 9:00 PM are marked LATE.";
+ }else{
+  $("scanAvailability").textContent="The 9:00 PM closing time has passed. Unrecorded teachers will be marked ABSENT when automatic closing runs.";
+ }
+}
+
+async function recordScannedAttendance(teacher){
+ const date=today();
+ const time=nowTime();
+
+ if(!isWorkingDay(date)){
+  say("scanMsg","Attendance is only available Monday to Friday.","error");
+  return;
+ }
+
+ if(time<"07:30"){
+  say("scanMsg","Attendance scanning opens at 7:30 AM. Current time: "+time,"error");
+  return;
+ }
+
+ if(time>"21:00"){
+  say("scanMsg","The attendance closing time has passed. Please contact the school administrator.","error");
+  return;
+ }
+
+ // Refresh today's records before checking for duplicates.
+ const check=await db.from("attendance")
+  .select("id,teacher_id,date,status")
+  .eq("school_id",school.id)
+  .eq("teacher_id",teacher.id)
+  .eq("date",date)
+  .maybeSingle();
+
+ if(check.error){
+  say("scanMsg","Could not check existing attendance: "+check.error.message,"error");
+  return;
+ }
+
+ if(check.data){
+  say("scanMsg",teacher.name+" already has attendance recorded today as "+check.data.status+".","error");
+  return;
+ }
+
+ const status=time<="09:00"?"PRESENT":"LATE";
+
+ const result=await db.from("attendance")
+  .insert({
+   school_id:school.id,
+   teacher_id:teacher.id,
+   teacher_name:teacher.name,
+   date:date,
+   status:status,
+   time:time,
+   note:"Recorded automatically by QR scan"
+  })
+  .select()
+  .single();
+
+ if(result.error){
+  say("scanMsg","Attendance could not be saved: "+result.error.message,"error");
+  return;
+ }
+
+ localLog("QR ATTENDANCE",teacher.name+" "+status+" "+date+" "+time);
+
+ try{
+  await load();
+ }catch(error){
+  console.error(error);
+ }
+
+ say("scanMsg","SUCCESS! "+teacher.name+" recorded as "+status+" at "+time+".","success");
+}
+
+/* QR SCANNER LIBRARY */
+
+async function loadQrLibrary(){
+ if(window.Html5Qrcode)return;
+
+ await new Promise((resolve,reject)=>{
+  const script=document.createElement("script");
+  script.src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js";
+  script.onload=resolve;
+  script.onerror=()=>reject(Error("QR scanner library could not load. Check your internet connection."));
+  document.head.appendChild(script);
+ });
+}
+
+async function stopScanner(){
+ if(scanner){
+  try{
+   if(scanner.isScanning)await scanner.stop();
+  }catch(error){}
+
+  try{
+   scanner.clear();
+  }catch(error){}
+
+  scanner=null;
+ }
+
+ $("qrReader").innerHTML="";
+}
+
+async function handleQrResult(raw){
+ const code=String(raw||"").trim();
+ const teacherId=code.startsWith("TAT|")?code.slice(4):code;
+
+ const teacher=teachers.find(t=>t.id===teacherId);
+
+ if(!teacher){
+  say("scanMsg","This QR code does not belong to a teacher registered in this school.","error");
+  return;
+ }
+
+ await recordScannedAttendance(teacher);
+}
+
+$("camera").onclick=async()=>{
+ if(!user||!school)return;
+
+ if(!isWorkingDay()){
+  say("aMsg","Attendance is only available Monday to Friday.","error");
+  return;
+ }
+
+ if(nowTime()<"07:30"){
+  say("aMsg","Scanning opens at 7:30 AM.","error");
+  return;
+ }
+
+ if(nowTime()>"21:00"){
+  say("aMsg","The attendance closing time has passed.","error");
+  return;
+ }
+
+ show("scannerBox");
+ say("scanMsg","Opening camera...");
+
+ try{
+  await stopScanner();
+  await loadQrLibrary();
+
+  scanner=new Html5Qrcode("qrReader");
+
+  await scanner.start(
+   {facingMode:"environment"},
+   {fps:10,qrbox:{width:220,height:220}},
+   async decodedText=>{
+    if(!scanner)return;
+
+    // Stop repeated callbacks from the same scan.
+    const activeScanner=scanner;
+    scanner=null;
+
+    try{
+     if(activeScanner.isScanning)await activeScanner.stop();
+    }catch(error){}
+
+    try{
+     activeScanner.clear();
+    }catch(error){}
+
+    $("qrReader").innerHTML="";
+
+    await handleQrResult(decodedText);
+   },
+   ()=>{}
+  );
+
+  hide("scanMsg");
+
+ }catch(error){
+  await stopScanner();
+  say("scanMsg","Camera could not start. Allow camera permission and use HTTPS. "+error.message,"error");
+ }
+};
+
+$("gallery").onclick=()=>{
+ if(!isWorkingDay()){
+  say("aMsg","Attendance is only available Monday to Friday.","error");
+  return;
+ }
+
+ if(nowTime()<"07:30"||nowTime()>"21:00"){
+  say("aMsg","Scanning is available between 7:30 AM and 9:00 PM.","error");
+  return;
+ }
+
+ $("qrFile").click();
+};
+
+$("qrFile").onchange=async()=>{
+ const file=$("qrFile").files[0];
+ if(!file)return;
+
+ show("scannerBox");
+ say("scanMsg","Reading QR code from image...");
+
+ try{
+  await stopScanner();
+  await loadQrLibrary();
+
+  scanner=new Html5Qrcode("qrReader");
+
+  const decodedText=await scanner.scanFile(file,true);
+
+  await stopScanner();
+  await handleQrResult(decodedText);
+
+ }catch(error){
+  await stopScanner();
+  say("scanMsg","Could not read the QR code. Use a clear image of the teacher's QR code.","error");
+ }finally{
+  $("qrFile").value="";
+ }
+};
+
+$("stopScanner").onclick=async()=>{
+ await stopScanner();
+ hide("scannerBox");
+};
+
+/* AUTOMATIC ABSENCE AT 9 PM */
+
+async function autoCloseDayIfNeeded(){
+ if(!user||!school||autoCloseBusy)return;
+
+ const date=today();
+ const time=nowTime();
+
+ // Only Monday to Friday.
+ if(!isWorkingDay(date))return;
+
+ // Wait until 9 PM.
+ if(time<"21:00")return;
+
+ autoCloseBusy=true;
+
+ try{
+  const result=await db.from("attendance")
+   .select("teacher_id")
+   .eq("school_id",school.id)
+   .eq("date",date);
+
+  if(result.error)throw result.error;
+
+  const alreadyRecorded=new Set((result.data||[]).map(r=>r.teacher_id));
+
+  const missing=teachers.filter(t=>!alreadyRecorded.has(t.id));
+
+  if(!missing.length)return;
+
+  const rows=missing.map(t=>({
+   school_id:school.id,
+   teacher_id:t.id,
+   teacher_name:t.name,
+   date:date,
+   status:"ABSENT",
+   time:null,
+   note:"Automatically marked absent at end of attendance day"
+  }));
+
+  const inserted=await db.from("attendance").insert(rows);
+
+  if(inserted.error)throw inserted.error;
+
+  localLog("DAILY ATTENDANCE CLOSED",date+"; "+missing.length+" teachers marked absent");
+
+  await load();
+
+ }catch(error){
+  console.error("Automatic attendance closing failed:",error);
+ }finally{
+  autoCloseBusy=false;
+ }
+}
+
+/* ATTENDANCE RECORDS */
+
+function renderAttendance(){
+ const date=$("filterDate").value;
+ const status=$("filterStatus").value;
+ const query=$("attendanceSearch").value.toLowerCase().trim();
+
+ const list=records.filter(r=>
+  (!date||r.date===date)&&
+  (!status||r.status===status)&&
+  [r.teacher_name,r.teacher_id].join(" ").toLowerCase().includes(query)
+ );
+
+ $("attendanceRows").innerHTML=list.map(r=>`
+  <tr>
+   <td>${esc(r.date)}</td>
+   <td>${esc(r.teacher_id)}</td>
+   <td>${esc(r.teacher_name)}</td>
+   <td>${badge(r.status)}</td>
+   <td>${esc(r.time||"—")}</td>
+   <td>${esc(r.note||"—")}</td>
+   <td>
+    <button class="red" data-delete-row="${esc(r.id)}">Delete</button>
+   </td>
+  </tr>
+ `).join("")||'<tr><td colspan="7">No attendance records found.</td></tr>';
+}
+
+["filterDate","filterStatus","attendanceSearch"].forEach(id=>{
+ $(id).addEventListener("input",renderAttendance);
+});
+
+$("attendanceRows").onclick=async e=>{
+ const button=e.target.closest("button[data-delete-row]");
+ if(!button)return;
+
+ if(!confirm("Delete this attendance record?"))return;
+
+ const {error}=await db.from("attendance")
+  .delete()
+  .eq("id",button.dataset.deleteRow)
+  .eq("school_id",school.id);
+
+ if(error){
+  alert(error.message);
+  return;
+ }
+
+ await load();
+};
+
+/* MONTHLY REPORTS */
+
+function initReport(){
+ const d=new Date();
+
+ $("rMonth").innerHTML=Array.from({length:12},(_,i)=>
+  `<option value="${i}">${new Date(2000,i,1).toLocaleString("en",{month:"long"})}</option>`
+ ).join("");
+
+ $("rMonth").value=d.getMonth();
+
+ $("rYear").innerHTML=Array.from({length:8},(_,i)=>
+  `<option>${d.getFullYear()-5+i}</option>`
+ ).join("");
+
+ $("rYear").value=d.getFullYear();
+}
+
+function reportData(){
+ const month=Number($("rMonth").value);
+ const year=Number($("rYear").value);
+ const query=$("rSearch").value.toLowerCase().trim();
+
+ return teachers
+  .filter(t=>(t.name+" "+t.id).toLowerCase().includes(query))
+  .map(t=>{
+   const list=records.filter(r=>{
+    const d=new Date(r.date+"T12:00:00");
+    return r.teacher_id===t.id&&
+     d.getMonth()===month&&
+     d.getFullYear()===year;
+   });
+
+   const present=list.filter(r=>r.status==="PRESENT").length;
+   const late=list.filter(r=>r.status==="LATE").length;
+   const absent=list.filter(r=>r.status==="ABSENT").length;
+   const total=list.length;
+
+   return [
+    t.id,
+    t.name,
+    present,
+    late,
+    absent,
+    total,
+    total?Math.round(present/total*100)+"%":"—"
+   ];
+  });
+}
+
+function renderReport(){
+ $("reportRows").innerHTML=reportData().map(row=>
+  "<tr>"+row.map(value=>"<td>"+esc(value)+"</td>").join("")+"</tr>"
+ ).join("")||"<tr><td colspan='7'>No teachers found.</td></tr>";
+}
+
+["rMonth","rYear","rSearch"].forEach(id=>{
+ $(id).addEventListener("input",renderReport);
+});
+
+/* EXPORTS AND BACKUP */
+
+function downloadCsv(filename,rows){
+ const csv=rows.map(row=>
+  row.map(value=>'"'+String(value??"").replace(/"/g,'""')+'"').join(",")
+ ).join("\r\n");
+
+ const url=URL.createObjectURL(
+  new Blob(["\uFEFF"+csv],{type:"text/csv;charset=utf-8"})
+ );
+
+ const link=document.createElement("a");
+ link.href=url;
+ link.download=filename;
+ link.click();
+
+ setTimeout(()=>URL.revokeObjectURL(url),1000);
+}
+
+$("exportAttendance").onclick=()=>downloadCsv("attendance.csv",[
+ ["Date","Teacher ID","Name","Status","Time","Note"],
+ ...records.map(r=>[
+  r.date,r.teacher_id,r.teacher_name,r.status,r.time,r.note
+ ])
+]);
+
+$("exportReport").onclick=()=>downloadCsv("monthly-report.csv",[
+ ["Teacher ID","Name","Present","Late","Absent","Days recorded","Present %"],
+ ...reportData()
+]);
+
+$("backup").onclick=()=>{
+ const file={
+  school:school.school_name,
+  exportedAt:new Date().toISOString(),
+  teachers:teachers,
+  attendance:records
+ };
+
+ const url=URL.createObjectURL(
+  new Blob([JSON.stringify(file,null,2)],{type:"application/json"})
+ );
+
+ const link=document.createElement("a");
+ link.href=url;
+ link.download="teachers-attendance-backup.json";
+ link.click();
+
+ setTimeout(()=>URL.revokeObjectURL(url),1000);
+};
+
+/* SETTINGS */
+
+$("refresh").onclick=async()=>{
+ try{
+  await load();
+  await autoCloseDayIfNeeded();
+  say("settingsMsg","Online data refreshed.","success");
+ }catch(error){
+  say("settingsMsg",error.message,"error");
+ }
+};
+
+$("resetPassword").onclick=async()=>{
+ const {error}=await db.auth.resetPasswordForEmail(user.email);
+
+ say(
+  "settingsMsg",
+  error?error.message:"Password reset email sent if the account exists.",
+  error?"error":"success"
+ );
+};
+
+/* START APPLICATION */
+
+(async()=>{
+ initReport();
+
+ $("filterDate").value=today();
+
+ try{
+  const {data,error}=await db.auth.getSession();
+
+  if(error)throw error;
+
+  if(data.session?.user){
+   await start(data.session.user);
+  }
+ }catch(error){
+  say("authMsg",error.message||"Could not start the application.","error");
+ }
+})();
+
+/*
+Check the closing rule periodically while the app is open.
+*/
+setInterval(async()=>{
+ if(user&&school){
+  updateScanAvailability();
+  await autoCloseDayIfNeeded();
+ }
+},60000);
+
+</script>
+</body>
+</html>
